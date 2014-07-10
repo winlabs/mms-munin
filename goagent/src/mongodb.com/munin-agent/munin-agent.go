@@ -45,8 +45,35 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 					conn.Write([]byte(".\r\n"))
 			}
 		case "config":
-			conn.Write([]byte("# Unknown service\r\n"))
-			conn.Write([]byte(".\r\n"))
+			switch tokens[1] {
+				case "iostat":
+					labels := iostat.GetLabels()
+					conn.Write([]byte("graph_title IOstat\r\n"))
+					conn.Write([]byte("graph_args --base 1024 -l 0\r\n"))
+					conn.Write([]byte("graph_vlabel blocks per ${graph_period} read (-) / written (+)\r\n"))
+					conn.Write([]byte("graph_category disk\r\n"))
+					conn.Write([]byte("graph_info This graph shows the I/O to and from block devices.\r\n"))
+					orderLine := "graph_order"
+					for i := 0; i < len(labels); i++ {
+						orderLine += fmt.Sprintf(" dev0_%d_read dev0_%d_write", i, i)
+					}
+					conn.Write([]byte(orderLine + "\r\n"))
+					for i := 0; i < len(labels); i++ {
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.label %s\r\n", i, labels[i])))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.type DERIVE\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.min 0\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.graph no\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.label %s\r\n", i, labels[i])))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.info I/O on device %s\r\n", i, labels[i])))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.type DERIVE\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.min 0\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.negative dev0_%d_read\r\n", i, i)))
+					}
+					conn.Write([]byte(".\r\n"))
+				default:
+					conn.Write([]byte("# Unknown service\r\n"))
+					conn.Write([]byte(".\r\n"))
+			}
 		case "quit":
 			return
 		}

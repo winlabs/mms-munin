@@ -25,6 +25,7 @@ type DISK_PERFORMANCE struct {
 
 type IOStat struct {
 	volumes []string
+	labels []string
 }
 
 type IOStatCountData struct {
@@ -35,19 +36,32 @@ type IOStatCountData struct {
 func NewIOStat() *IOStat {
 	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
 	getDriveType := kernelDLL.MustFindProc("GetDriveTypeW")
+	getVolumeInformation := kernelDLL.MustFindProc("GetVolumeInformationW")
 
 	possibleVolumes := []string{ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" }
 	volumes := make([]string, 0, 26)
+	labels := make([]string, 0, 26)
 	for i := 0; i < 26; i++ {
 		root := possibleVolumes[i] + ":\\"
-		rootPtr, _ := syscall.UTF16PtrFromString(root)
+		rootPtr := syscall.StringToUTF16Ptr(root)
 		driveType, _, _ := getDriveType.Call(uintptr(unsafe.Pointer(rootPtr)))
 		if driveType == DRIVE_FIXED {
 			volumes = append(volumes, possibleVolumes[i])
+			labelBuffer := [syscall.MAX_PATH]uint16{}
+			getVolumeInformation.Call(
+				uintptr(unsafe.Pointer(rootPtr)),
+				uintptr(unsafe.Pointer(&labelBuffer)),
+				syscall.MAX_PATH,
+				0,
+				0,
+				0,
+				0,
+				0)
+			labels = append(labels, syscall.UTF16ToString((&labelBuffer)[:]))
 		}
 	}
 
-	return &IOStat{ volumes: volumes }
+	return &IOStat{ volumes: volumes, labels: labels }
 }
 
 func (iostat *IOStat) GetCountData() []IOStatCountData {
@@ -66,7 +80,7 @@ func (iostat *IOStat) GetCountData() []IOStatCountData {
 			0)
 		diskPerformance := DISK_PERFORMANCE{}
 		diskPerformanceSize := uint32(0)
-		b, _, _ := deviceIoControl.Call(
+		deviceIoControl.Call(
 			uintptr(hFile),
 			IOCTL_DISK_PERFORMANCE,
 			0,
@@ -80,4 +94,8 @@ func (iostat *IOStat) GetCountData() []IOStatCountData {
 		data[i].WriteCount = diskPerformance.WriteCount
 	}
 	return data
+}
+
+func (iostat *IOStat) GetLabels() []string {
+	return iostat.labels
 }
