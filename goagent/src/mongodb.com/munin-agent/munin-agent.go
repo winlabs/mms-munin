@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor) {
+func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *components.IOStat) {
 	defer conn.Close()
 	conn.Write([]byte("# munin node\r\n"))
 	fmt.Printf("Accepted connection\n")
@@ -33,8 +33,11 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor) {
 					conn.Write([]byte(fmt.Sprintf("guest.value %d\r\n", cpuTimes.GuestTime)))
 					conn.Write([]byte(".\r\n"))
 				case "iostat":
-					conn.Write([]byte("dev202_0_read.value 0\r\n"))
-					conn.Write([]byte("dev202_0_write.value 0\r\n"))
+					countData := iostat.GetCountData()
+					for i := 0; i < len(countData); i++ {
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.value %d\r\n", i, countData[i].ReadCount)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.value %d\r\n", i, countData[i].WriteCount)))
+					}
 					conn.Write([]byte(".\r\n"))
 				case "iostat_ios":
 					conn.Write([]byte("dev202_1_rtime.value 0\r\n"))
@@ -52,6 +55,7 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor) {
 
 func main() {
 	cpu := components.NewCPUMonitor()
+	iostat := components.NewIOStat()
 	ln, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 4949})
 	if err != nil {
 		fmt.Printf("Failed to start server!")
@@ -63,6 +67,6 @@ func main() {
 			fmt.Printf("Failed to accept connection")
 			continue
 		}
-		go handleConnection(conn, cpu)
+		go handleConnection(conn, cpu, iostat)
 	}
 }
