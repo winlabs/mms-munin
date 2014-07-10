@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"mongodb.com/munin-agent/components"
 	"net"
 	"strings"
 )
 
-func handleConnection(conn *net.TCPConn) {
+func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor) {
 	defer conn.Close()
 	conn.Write([]byte("# munin node\r\n"))
 	fmt.Printf("Accepted connection\n")
@@ -20,15 +21,16 @@ func handleConnection(conn *net.TCPConn) {
 		case "fetch":
 			switch tokens[1] {
 				case "cpu":
-					conn.Write([]byte("user.value 0\r\n"))
-					conn.Write([]byte("nice.value 0\r\n"))
-					conn.Write([]byte("system.value 0\r\n"))
-					conn.Write([]byte("idle.value 0\r\n"))
-					conn.Write([]byte("iowait.value 0\r\n"))
-					conn.Write([]byte("irq.value 0\r\n"))
-					conn.Write([]byte("softirq.value 0\r\n"))
-					conn.Write([]byte("steal.value 0\r\n"))
-					conn.Write([]byte("guest.value 0\r\n"))
+					cpuTimes := cpu.GetCPUTimes()
+					conn.Write([]byte(fmt.Sprintf("user.value %d\r\n", cpuTimes.UserTime)))
+					conn.Write([]byte(fmt.Sprintf("nice.value %d\r\n", cpuTimes.NiceTime)))
+					conn.Write([]byte(fmt.Sprintf("system.value %d\r\n", cpuTimes.SystemTime)))
+					conn.Write([]byte(fmt.Sprintf("idle.value %d\r\n", cpuTimes.IdleTime)))
+					conn.Write([]byte(fmt.Sprintf("iowait.value %d\r\n", cpuTimes.IOWaitTime)))
+					conn.Write([]byte(fmt.Sprintf("irq.value %d\r\n", cpuTimes.IRQTime)))
+					conn.Write([]byte(fmt.Sprintf("softirq.value %d\r\n", cpuTimes.SoftIRQTime)))
+					conn.Write([]byte(fmt.Sprintf("steal.value %d\r\n", cpuTimes.StealTime)))
+					conn.Write([]byte(fmt.Sprintf("guest.value %d\r\n", cpuTimes.GuestTime)))
 					conn.Write([]byte(".\r\n"))
 				case "iostat":
 					conn.Write([]byte("dev202_0_read.value 0\r\n"))
@@ -49,6 +51,7 @@ func handleConnection(conn *net.TCPConn) {
 }
 
 func main() {
+	cpu := components.NewCPUMonitor()
 	ln, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 4949})
 	if err != nil {
 		fmt.Printf("Failed to start server!")
@@ -60,6 +63,6 @@ func main() {
 			fmt.Printf("Failed to accept connection")
 			continue
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, cpu)
 	}
 }
