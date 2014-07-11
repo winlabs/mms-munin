@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+
+<!-- (C) Copyright 2014, MongoDB, Inc. -->
+<project name="agent-packaging" basedir="./" xmlns:aspectj="antlib:org.aspectj">
+    <property environment="env"/>
+    <property name="build.dir" location="build"/>
+
+    <target name="build.dir.make">
+        <mkdir dir="${build.dir}"/>
+    </target>
+    
+    <!-- START go -->
+    <property name="go.root" value="${env.GOROOT}"/>
+    <property name="go.path" value="${build.dir}/go-dependencies"/>
+    <property name="go.arch" value="amd64"/>
+
+    <macrodef name="gpm">
+        <attribute name="deps"/>
+        <sequential>
+            <mkdir dir="${go.path}"/>
+            <echo message="Getting Go dependencies..."/>
+            <echo message="GOROOT - ${go.root}"/>
+            <echo message="GOPATH - ${go.path}"/>
+            <echo message="GOARCH - ${go.arch}"/>
+
+            <exec executable="bash" failonerror="true">
+                <arg value="../gpm"/>
+                <arg value="install"/>
+                <arg value="@{deps}"/>
+                <env key="GOROOT" value="${go.root}"/>
+                <env key="GOPATH" value="${go.path}"/>
+                <env key="GOARCH" value="${go.arch}"/>
+            </exec>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="go-build">
+        <attribute name="sourcedir"/>
+        <attribute name="version"/>
+        <attribute name="versionfile"/>
+        <attribute name="mainfile"/>
+        <attribute name="destfile"/>
+        <attribute name="tags"/>
+
+        <sequential>
+            <copy todir="${go.path}/src">
+                <fileset dir="@{sourcedir}/" includes="**"/>
+            </copy>
+
+            <replaceregexp file="${go.path}/src@{versionfile}"
+                match="const AGENT_VERSION = &quot;(.*)&quot;"
+                replace="const AGENT_VERSION = &quot;@{version}&quot;"
+                byline="true"/>
+
+            <exec executable="${env.GOROOT}/bin/go" failonerror="true">
+                <arg value="build"/>
+                <arg value="-o"/>
+                <arg value="@{destfile}"/>
+                <arg value="-tags"/>
+                <arg value="'@{tags}'"/>
+                <arg value="-x"/>
+                <arg value="${go.path}/src@{mainfile}"/>
+
+                <env key="GOROOT" value="${go.root}"/>
+                <env key="GOPATH" value="${go.path}"/>
+                <env key="GOARCH" value="${go.arch}"/>
+            </exec>
+        </sequential>
+    </macrodef>
+    <!-- END go -->
+
+    <!--
+        Ant os.name is not very filename friendly (Windows, Linux, Mac OS X). This
+        next block converts those to `windows`, `linux`, and `osx` and sets that
+        as `archive.os-name`.
+    -->
+    <condition property="os-nice.name.isWindows">
+        <os family="windows"/>
+    </condition>
+    <condition property="os-nice.name.isLinux">
+        <equals arg1="${os.name}" arg2="Linux"/>
+    </condition>
+    <condition property="os-nice-name.isOSX">
+        <equals arg1="${os.name}" arg2="Mac OS X"/>
+    </condition>
+    <target name="archive.set-os-name-windows" if="os-nice.name.isWindows">
+        <property name="archive.os-name" value="windows"/>
+    </target>
+    <target name="archive.set-os-name-linux" if="os-nice.name.isLinux">
+        <property name="archive.os-name" value="linux"/>
+    </target>
+    <target name="archive.set-os-name-osx" if="os-nice.name.isOSX">
+        <property name="archive.os-name" value="osx"/>
+    </target>
+    <target name="archive.set-os-name" depends="archive.set-os-name-windows,archive.set-os-name-linux,archive.set-os-name-osx">
+        <echo message="For os.name ${os.name} picked ${archive.os-name}"/>
+    </target>
+    
+    <target name="munin-agent.go-get-dependencies" unless="munin-agent.skip-go-dependencies">
+        <gpm deps="../goagent/godeps"/>
+    </target>
+
+    <target name="munin-agent-service.go-get-dependencies" depends="munin-agent.go-get-dependencies" unless="munin-agent.skip-go-dependencies">
+        <gpm deps="../goagent/godeps-windows"/>
+    </target>
+
+    <property name="munin-agent.build-service-out" value="${build.dir}/mongodb-mms-munin-agent-service.exe"/>
+    <target name="munin-agent.build-service" depends="munin-agent-service.go-get-dependencies,build.dir.make"
+            if="os-nice.name.isWindows">
+        <go-build sourcedir="../goagent/src"
+                  version="${munin-agent.version}"
+                  versionfile="/mongodb.com/munin-agent/components/version.go"
+                  mainfile="/mongodb.com/munin-agent/munin-agent-service.go"
+                  destfile="${munin-agent.build-service-out}"
+                  tags="${go.tags.sasl}"/>
+    </target>
+</project>

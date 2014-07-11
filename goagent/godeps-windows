@@ -1,0 +1,5 @@
+code.google.com/p/winsvc/svc            4264d55af70f
+# These are not needed since the first command checks out the entire repo
+# code.google.com/p/winsvc/debug        4264d55af70f
+# code.google.com/p/winsvc/eventlog     4264d55af70f
+# code.google.com/p/winsvc/mgr          4264d55af70f
