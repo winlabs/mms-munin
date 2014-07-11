@@ -4,13 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"mongodb.com/munin-agent/components"
+	"os"
 	"net"
 	"strings"
 )
 
 func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *components.IOStat) {
 	defer conn.Close()
-	conn.Write([]byte("# munin node\r\n"))
+	hostname, _ := os.Hostname()
+	conn.Write([]byte(fmt.Sprintf("# munin node at %s\r\n", hostname)))
 
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
