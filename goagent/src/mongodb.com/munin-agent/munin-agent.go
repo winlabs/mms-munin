@@ -11,11 +11,9 @@ import (
 func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *components.IOStat) {
 	defer conn.Close()
 	conn.Write([]byte("# munin node\r\n"))
-	fmt.Printf("Accepted connection\n")
 
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
-		fmt.Printf("%s\n", scanner.Text())
 		tokens := strings.Split(scanner.Text(), " ")
 		switch tokens[0] {
 		case "fetch":
