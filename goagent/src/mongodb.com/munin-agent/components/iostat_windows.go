@@ -57,9 +57,9 @@ func monitorIOStat(iostat* IOStat) {
 	for {
 		<-ticker
 		iostat.mutex.Lock()
-		for i := 0; i < len(iostat.volumes); i++ {
+		for i, volume := range iostat.volumes {
 			hFile, _ := syscall.CreateFile(
-				syscall.StringToUTF16Ptr("\\\\.\\" + iostat.volumes[i] + ":"),
+				syscall.StringToUTF16Ptr("\\\\.\\" + volume + ":"),
 				0,
 				syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE,
 				nil,
@@ -99,12 +99,12 @@ func NewIOStat() *IOStat {
 	possibleVolumes := []string{ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" }
 	volumes := make([]string, 0, 26)
 	labels := make([]string, 0, 26)
-	for i := 0; i < 26; i++ {
-		root := possibleVolumes[i] + ":\\"
+	for _, candidate := range possibleVolumes {
+		root := candidate + ":\\"
 		rootPtr := syscall.StringToUTF16Ptr(root)
 		driveType, _, _ := getDriveType.Call(uintptr(unsafe.Pointer(rootPtr)))
 		if driveType == DRIVE_FIXED {
-			volumes = append(volumes, possibleVolumes[i])
+			volumes = append(volumes, candidate)
 			labelBuffer := [syscall.MAX_PATH]uint16{}
 			getVolumeInformation.Call(
 				uintptr(unsafe.Pointer(rootPtr)),

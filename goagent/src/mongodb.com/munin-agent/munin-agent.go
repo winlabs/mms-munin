@@ -34,9 +34,9 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 					conn.Write([]byte(".\r\n"))
 				case "iostat":
 					countData := iostat.GetCountData()
-					for i := 0; i < len(countData); i++ {
-						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.value %d\r\n", i, countData[i].ReadCount)))
-						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.value %d\r\n", i, countData[i].WriteCount)))
+					for i, count := range countData {
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.value %d\r\n", i, count.ReadCount)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.value %d\r\n", i, count.WriteCount)))
 					}
 					conn.Write([]byte(".\r\n"))
 				case "iostat_ios":
@@ -65,17 +65,17 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 					conn.Write([]byte("graph_category disk\r\n"))
 					conn.Write([]byte("graph_info This graph shows the I/O to and from block devices.\r\n"))
 					orderLine := "graph_order"
-					for i := 0; i < len(labels); i++ {
+					for i := range labels {
 						orderLine += fmt.Sprintf(" dev0_%d_read dev0_%d_write", i, i)
 					}
 					conn.Write([]byte(orderLine + "\r\n"))
-					for i := 0; i < len(labels); i++ {
-						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.label %s\r\n", i, labels[i])))
+					for i, label := range labels {
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.label %s\r\n", i, label)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.type DERIVE\r\n", i)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.min 0\r\n", i)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_read.graph no\r\n", i)))
-						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.label %s\r\n", i, labels[i])))
-						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.info I/O on device %s\r\n", i, labels[i])))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.label %s\r\n", i, label)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.info I/O on device %s\r\n", i, label)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.type DERIVE\r\n", i)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.min 0\r\n", i)))
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.negative dev0_%d_read\r\n", i, i)))
