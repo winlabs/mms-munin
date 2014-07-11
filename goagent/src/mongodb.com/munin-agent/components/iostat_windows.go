@@ -1,7 +1,9 @@
 package components
 
 import (
+	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -23,14 +25,54 @@ type DISK_PERFORMANCE struct {
 	StorageManagerName [8]uint16
 }
 
-type IOStat struct {
-	volumes []string
-	labels []string
-}
-
 type IOStatCountData struct {
 	ReadCount uint32
 	WriteCount uint32
+}
+
+type IOStat struct {
+	mutex sync.Mutex
+	volumes []string
+	labels []string
+	lastCounts []IOStatCountData
+	countDiffs []IOStatCountData
+}
+
+func monitorIOStat(iostat* IOStat) {
+	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
+	deviceIoControl := kernelDLL.MustFindProc("DeviceIoControl")
+	ticker := time.Tick(time.Second)
+	for {
+		<-ticker
+		iostat.mutex.Lock()
+		for i := 0; i < len(iostat.volumes); i++ {
+			hFile, _ := syscall.CreateFile(
+				syscall.StringToUTF16Ptr("\\\\.\\" + iostat.volumes[i] + ":"),
+				0,
+				syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE,
+				nil,
+				syscall.OPEN_EXISTING,
+				0,
+				0)
+			diskPerformance := DISK_PERFORMANCE{}
+			diskPerformanceSize := uint32(0)
+			deviceIoControl.Call(
+				uintptr(hFile),
+				IOCTL_DISK_PERFORMANCE,
+				0,
+				0,
+				uintptr(unsafe.Pointer(&diskPerformance)),
+				unsafe.Sizeof(diskPerformance),
+				uintptr(unsafe.Pointer(&diskPerformanceSize)),
+				0)
+			syscall.CloseHandle(hFile)
+			iostat.countDiffs[i].ReadCount = diskPerformance.ReadCount - iostat.lastCounts[i].ReadCount
+			iostat.countDiffs[i].WriteCount = diskPerformance.WriteCount - iostat.lastCounts[i].WriteCount
+			iostat.lastCounts[i].ReadCount = diskPerformance.ReadCount
+			iostat.lastCounts[i].WriteCount = diskPerformance.WriteCount
+		}
+		iostat.mutex.Unlock()
+	}
 }
 
 func NewIOStat() *IOStat {
@@ -61,39 +103,21 @@ func NewIOStat() *IOStat {
 		}
 	}
 
-	return &IOStat{ volumes: volumes, labels: labels }
+	iostat := &IOStat{
+		volumes: volumes,
+		labels: labels,
+		lastCounts: make([]IOStatCountData, len(volumes)),
+		countDiffs: make([]IOStatCountData, len(volumes)),
+	}
+	go monitorIOStat(iostat)
+	return iostat
 }
 
 func (iostat *IOStat) GetCountData() []IOStatCountData {
-	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
-	deviceIoControl := kernelDLL.MustFindProc("DeviceIoControl")
-
-	data := make([]IOStatCountData, len(iostat.volumes))
-	for i := 0; i < len(iostat.volumes); i++ {
-		hFile, _ := syscall.CreateFile(
-			syscall.StringToUTF16Ptr("\\\\.\\" + iostat.volumes[i] + ":"),
-			0,
-			syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE,
-			nil,
-			syscall.OPEN_EXISTING,
-			0,
-			0)
-		diskPerformance := DISK_PERFORMANCE{}
-		diskPerformanceSize := uint32(0)
-		deviceIoControl.Call(
-			uintptr(hFile),
-			IOCTL_DISK_PERFORMANCE,
-			0,
-			0,
-			uintptr(unsafe.Pointer(&diskPerformance)),
-			unsafe.Sizeof(diskPerformance),
-			uintptr(unsafe.Pointer(&diskPerformanceSize)),
-			0)
-		syscall.CloseHandle(hFile)
-		data[i].ReadCount = diskPerformance.ReadCount
-		data[i].WriteCount = diskPerformance.WriteCount
-	}
-	return data
+	iostat.mutex.Lock()
+	result := iostat.countDiffs
+	iostat.mutex.Unlock()
+	return result
 }
 
 func (iostat *IOStat) GetLabels() []string {
