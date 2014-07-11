@@ -55,6 +55,66 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 			}
 		case "config":
 			switch tokens[1] {
+				case "cpu":
+					lines := []string{
+						"graph_title CPU usage",
+						"graph_order system user nice idle iowait irq softirq",
+						"graph_args --base 1000 -r --lower-limit 0 --upper-limit 100",
+						"graph_vlabel %",
+						"graph_scale no",
+						"graph_info This graph shows how CPU time is spent.",
+						"graph_category system",
+						"graph_period second",
+						"system.label system",
+						"system.draw AREA",
+						"system.min 0",
+						"system.type DERIVE",
+						"system.info CPU time spent by the kernel in system activities",
+						"user.label user",
+						"user.draw STACK",
+						"user.min 0",
+						"user.type DERIVE",
+						"user.info CPU time spent by normal programs and daemons",
+						"nice.label nice",
+						"nice.draw STACK",
+						"nice.min 0",
+						"nice.type DERIVE",
+						"nice.info CPU time spent by nice(1)d programs",
+						"idle.label idle",
+						"idle.draw STACK",
+						"idle.min 0",
+						"idle.type DERIVE",
+						"idle.info Idle CPU time",
+						"iowait.label iowait",
+						"iowait.draw STACK",
+						"iowait.min 0",
+						"iowait.type DERIVE",
+						"iowait.info CPU time spent waiting for I/O operations to finish when there is nothing else to do.",
+						"irq.label irq",
+						"irq.draw STACK",
+						"irq.min 0",
+						"irq.type DERIVE",
+						"irq.info CPU time spent handling interrupts",
+						"softirq.label softirq",
+						"softirq.draw STACK",
+						"softirq.min 0",
+						"softirq.type DERIVE",
+						"softirq.info CPU time spent handling \"batched\" interrupts",
+						"steal.label steal",
+						"steal.draw STACK",
+						"steal.min 0",
+						"steal.type DERIVE",
+						"steal.info The time that a virtual CPU had runnable tasks, but the virtual CPU itself was not running",
+						"guest.label guest",
+						"guest.draw STACK",
+						"guest.min 0",
+						"guest.type DERIVE",
+						"guest.info The time spent running a virtual CPU for guest operating systems under the control of the Linux kernel.",
+						".",
+					}
+					for _, line := range lines {
+						conn.Write([]byte(line + "\r\n"))
+					}
 				case "iostat":
 					labels := iostat.GetLabels()
 					conn.Write([]byte("graph_title IOstat\r\n"))
