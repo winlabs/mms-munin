@@ -115,7 +115,12 @@ func NewIOStat() *IOStat {
 				0,
 				0,
 				0)
-			labels = append(labels, syscall.UTF16ToString((&labelBuffer)[:]))
+			label := syscall.UTF16ToString((&labelBuffer)[:])
+			if len(label) > 0 {
+				labels = append(labels, label)
+			} else {
+				labels = append(labels, candidate + "Drive")
+			}
 		}
 	}
 
