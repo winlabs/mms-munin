@@ -69,6 +69,65 @@
     </macrodef>
     <!-- END go -->
 
+    <!-- START wix -->
+    <macrodef name="wix-build">
+        <attribute name="localefile"/>
+        <attribute name="packagefile"/>
+        <attribute name="objectdir"/>
+        <attribute name="archivedir"/>
+        <attribute name="sourcedir"/>
+        <element name="sourcefiles"/>
+
+        <sequential>
+            <delete dir="@{objectdir}"/>
+            <exec executable="candle" failonerror="true">
+                <arg value="-nologo"/>
+                <sourcefiles/>
+                <arg value="-dGOARCH=${go.arch}"/>
+                <arg value="-dVERSION=${munin-agent.version}"/>
+                <arg value="-ext"/>
+                <arg value="WixFirewallExtension"/>
+                <arg value="-o"/>
+                <arg value="@{objectdir}/"/>
+            </exec>
+            <exec executable="light" failonerror="true">
+                <arg value="-nologo"/>
+                <arg value="-sval"/>
+                <arg value="@{objectdir}/*.wixobj"/>
+                <arg value="-loc"/>
+                <arg value="@{localefile}"/>
+                <arg value="-ext"/>
+                <arg value="WixUIExtension"/>
+                <arg value="-ext"/>
+                <arg value="WixFirewallExtension"/>
+                <arg value="-o"/>
+                <arg value="@{packagefile}"/>
+                <arg value="-b"/>
+                <arg value="@{archivedir}"/>
+                <arg value="-b"/>
+                <arg value="@{sourcedir}"/>
+            </exec>
+        </sequential>
+    </macrodef>
+    <!-- END wix -->
+    
+    <!--
+        Go architectures are amd64 and 386. Debian packages use amd64 and i386. RPM packages
+        use x86_64 and i386. This next block does the conversion.
+    -->
+    <condition property="go.arch.is386">
+        <equals arg1="${go.arch}" arg2="386"/>
+    </condition>
+
+    <target name="rpm-package.set-arch-386" if="go.arch.is386">
+        <property name="rpm-package.arch" value="i386"/>
+    </target>
+    <target name="rpm-package.set-arch-amd64" unless="go.arch.is386">
+        <property name="rpm-package.arch" value="x86_64"/>
+    </target>
+    <target name="rpm-package.set-arch" depends="rpm-package.set-arch-386,rpm-package.set-arch-amd64">
+    </target>
+    
     <!--
         Ant os.name is not very filename friendly (Windows, Linux, Mac OS X). This
         next block converts those to `windows`, `linux`, and `osx` and sets that
@@ -113,5 +172,41 @@
                   mainfile="/mongodb.com/munin-agent/munin-agent-service.go"
                   destfile="${munin-agent.build-service-out}"
                   tags="${go.tags.sasl}"/>
+    </target>
+    
+    <!--
+        Create a Windows Installer Packaged Munin Agent
+        
+        Prerequisites:
+        wix - Available for download at http://wix.codeplex.com
+        golang - `GOROOT` must be set or passed in as `go.root`
+        
+        Parameters:
+        munin-agent.version (required)
+        munin-agent.package-version (required) - The number of times this `munin-agent.version` has been packaged
+        go.arch (optional) - `amd64` (default) or `386`
+    -->
+    <target name="munin-agent.create-msi" depends="munin-agent.build-service,archive.set-os-name,rpm-package.set-arch">
+        <property name="munin-agent.create-msi.filename"
+                  value="mongodb-mms-munin-agent-${munin-agent.version}-${munin-agent.package-version}.${archive.os-name}_${rpm-package.arch}"/>
+
+        <property name="munin-agent.create-msi.temp-dir" value="${build.dir}/wix-temp" />
+        <property name="munin-agent.create-msi.temp-dir-agent"
+                  value="${munin-agent.create-msi.temp-dir}/${munin-agent.create-msi.filename}"/>
+
+        <delete dir="${munin-agent.create-msi.temp-dir-agent}"/>
+        <mkdir dir="${munin-agent.create-msi.temp-dir-agent}"/>
+
+        <copy file="${munin-agent.build-service-out}" todir="${munin-agent.create-msi.temp-dir-agent}"/>
+
+        <wix-build localefile="munin-agent/msi/munin-agent.en-us.wxl"
+                   packagefile="${build.dir}/${munin-agent.create-msi.filename}.msi"
+                   objectdir="${build.dir}/wix-objects"
+                   archivedir="${munin-agent.create-msi.temp-dir-agent}"
+                   sourcedir="munin-agent/msi">
+            <sourcefiles>
+                <arg value="munin-agent/msi/munin-agent.wxs"/>
+            </sourcefiles>
+        </wix-build>
     </target>
 </project>

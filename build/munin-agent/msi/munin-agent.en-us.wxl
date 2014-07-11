@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization">
+    <String Id="LANG">1033</String>
+    <String Id="ProductName">MMS Munin Agent</String>
+    <String Id="Description">MMS Munin Agent Installer</String>
+    <String Id="NoDowngradeError">A later version of [ProductName] is already installed.</String>
+    <String Id="ServiceDisplayName">MMS Munin Agent</String>
+    <String Id="ServiceDescription">Munin agent for MongoDB Management Service.</String>
+</WixLocalization>

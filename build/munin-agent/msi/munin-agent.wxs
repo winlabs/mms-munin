@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:firewall="http://schemas.microsoft.com/wix/FirewallExtension">
+    <Product Name="!(loc.ProductName)" Id="*"
+             UpgradeCode="99560289-307E-44A7-AE5D-749A7F9D2DF0" Language="!(loc.LANG)" Codepage="1252"
+             Version="$(var.VERSION)" Manufacturer="MongoDB">
+        
+        <?if $(var.GOARCH) = amd64 ?>
+            <?define Win64 = "yes" ?>
+            <?define Platform = "x64" ?>
+            <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+        <?else ?>
+            <?define Win64 = "no" ?>
+            <?define Platform = "x86" ?>
+            <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+        <?endif ?>
+
+        <Package Id="*" Keywords="MMS" Description="!(loc.Description)" Manufacturer="MongoDB"
+                 InstallerVersion="200" Languages="1033" Compressed="yes" SummaryCodepage="1252"
+                 Platform="$(var.Platform)" />
+        <Media Id="1" Cabinet="munin.cab" EmbedCab="yes" />
+
+        <UI Id="MMSMuninUI">
+            <UIRef Id="WixUI_InstallDir" />
+            <UIRef Id="WixUI_ErrorProgressText" />
+        </UI>
+
+        <WixVariable Id="WixUIBannerBmp" Value="banner.bmp" />
+        <WixVariable Id="WixUIDialogBmp" Value="dialog.bmp" />
+        <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+        <Property Id="ARPPRODUCTICON" Value="MongoDBIcon" />
+        <Property Id="ARPHELPLINK" Value="http://mms.mongodb.com" />
+        <Property Id="ARPURLINFOABOUT" Value="http://mms.mongodb.com/links/support" />
+
+        <MajorUpgrade DowngradeErrorMessage="!(loc.NoDowngradeError)" />
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="$(var.PlatformProgramFilesFolder)" Name="PFiles">
+                <Directory Id="MongoDB" Name="MongoDB">
+                    <Directory Id="MMS" Name="MMS">
+                        <Directory Id="Agents" Name="Agents">
+                            <Directory Id="INSTALLDIR" Name="Munin">
+                                <Component Id="MuninAgent" Guid="086B2453-6FDA-46BA-BF00-982AD292B242" Win64="$(var.Win64)">
+                                    <File Id="MuninAgentEXE" Name="mongodb-mms-munin-agent-service.exe" DiskId="1"
+                                          Source="mongodb-mms-munin-agent-service.exe" KeyPath="yes" />
+                                    <ServiceInstall Id="MuninServiceInstall" DisplayName="!(loc.ServiceDisplayName)"
+                                                    Description="!(loc.ServiceDescription)" Name="MMSMunin"
+                                                    ErrorControl="normal" Start="auto" Type="ownProcess" Vital="yes" />
+                                    <ServiceControl Id="MuninServiceControl" Name="MMSMunin" Start="install"
+                                                    Stop="uninstall" Remove="uninstall" />
+                                    <firewall:FirewallException Id="MuninFirewall" Name="MMSMunin"
+                                                                Program="[#MuninAgentEXE]" Scope="any" />
+                                </Component>
+                            </Directory>
+                        </Directory>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature Id="MuninAgent" Level="1">
+            <ComponentRef Id="MuninAgent" />
+        </Feature>
+
+        <Icon Id="MongoDBIcon" SourceFile="mongodb.ico" />
+    </Product>
+</Wix>
