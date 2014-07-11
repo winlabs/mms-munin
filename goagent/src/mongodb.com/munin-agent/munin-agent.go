@@ -81,6 +81,22 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 						conn.Write([]byte(fmt.Sprintf("dev0_%d_write.negative dev0_%d_read\r\n", i, i)))
 					}
 					conn.Write([]byte(".\r\n"))
+				case "iostat_ios":
+					labels := iostat.GetLabels()
+					conn.Write([]byte("graph_title IO Service time\r\n"))
+					conn.Write([]byte("graph_args --base 1000 --logarithmic\r\n"))
+					conn.Write([]byte("graph_category disk\r\n"))
+					conn.Write([]byte("graph_vlabel seconds\r\n"))
+					conn.Write([]byte("graph_info For each applicable device this plugin shows the latency (or delay) for I/O operations on that disk device. The delay is in part made up of waiting for the disk to flush the data, and if the data arrives at the disk faster than it can read or write it then the delay time will include the time needed for waiting in the queue.\r\n"))
+					for i, label := range labels {
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_rtime.label %s read\r\n", i, label)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_rtime.type GAUGE\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_rtime.cdef dev0_%d_rtime,1000,/\r\n", i, i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_wtime.label %s write\r\n", i, label)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_wtime.type GAUGE\r\n", i)))
+						conn.Write([]byte(fmt.Sprintf("dev0_%d_wtime.cdef dev_0_%d_wtime,1000,/\r\n", i, i)))
+					}
+					conn.Write([]byte(".\r\n"))
 				default:
 					conn.Write([]byte("# Unknown service\r\n"))
 					conn.Write([]byte(".\r\n"))
