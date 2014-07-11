@@ -30,12 +30,24 @@ type IOStatCountData struct {
 	WriteCount uint32
 }
 
+type IOStatTimeData struct {
+	ReadTime int64
+	WriteTime int64
+}
+
+type IOStatAverageTimeData struct {
+	AverageReadTime float32
+	AverageWriteTime float32
+}
+
 type IOStat struct {
 	mutex sync.Mutex
 	volumes []string
 	labels []string
 	lastCounts []IOStatCountData
 	countDiffs []IOStatCountData
+	lastTimes []IOStatTimeData
+	timeDiffs []IOStatTimeData
 }
 
 func monitorIOStat(iostat* IOStat) {
@@ -70,6 +82,10 @@ func monitorIOStat(iostat* IOStat) {
 			iostat.countDiffs[i].WriteCount = diskPerformance.WriteCount - iostat.lastCounts[i].WriteCount
 			iostat.lastCounts[i].ReadCount = diskPerformance.ReadCount
 			iostat.lastCounts[i].WriteCount = diskPerformance.WriteCount
+			iostat.timeDiffs[i].ReadTime = diskPerformance.ReadTime - iostat.lastTimes[i].ReadTime
+			iostat.timeDiffs[i].WriteTime = diskPerformance.WriteTime - iostat.lastTimes[i].WriteTime
+			iostat.lastTimes[i].ReadTime = diskPerformance.ReadTime
+			iostat.lastTimes[i].WriteTime = diskPerformance.WriteTime
 		}
 		iostat.mutex.Unlock()
 	}
@@ -108,6 +124,8 @@ func NewIOStat() *IOStat {
 		labels: labels,
 		lastCounts: make([]IOStatCountData, len(volumes)),
 		countDiffs: make([]IOStatCountData, len(volumes)),
+		lastTimes: make([]IOStatTimeData, len(volumes)),
+		timeDiffs: make([]IOStatTimeData, len(volumes)),
 	}
 	go monitorIOStat(iostat)
 	return iostat
@@ -118,6 +136,27 @@ func (iostat *IOStat) GetCountData() []IOStatCountData {
 	result := iostat.countDiffs
 	iostat.mutex.Unlock()
 	return result
+}
+
+func (iostat* IOStat) GetAverageTimeData() []IOStatAverageTimeData {
+	iostat.mutex.Lock()
+	countData := iostat.countDiffs
+	timeDiffs := iostat.timeDiffs
+	iostat.mutex.Unlock()
+	averages := make([]IOStatAverageTimeData, len(countData))
+	for i, count := range countData {
+		if count.ReadCount == 0 {
+			averages[i].AverageReadTime = -1
+		} else {
+			averages[i].AverageReadTime = float32(timeDiffs[i].ReadTime / 10000) / float32(count.ReadCount)
+		}
+		if count.WriteCount == 0 {
+			averages[i].AverageWriteTime = -1
+		} else {
+			averages[i].AverageWriteTime = float32(timeDiffs[i].WriteTime / 10000) / float32(count.WriteCount)
+		}
+	}
+	return averages
 }
 
 func (iostat *IOStat) GetLabels() []string {

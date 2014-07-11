@@ -40,8 +40,19 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 					}
 					conn.Write([]byte(".\r\n"))
 				case "iostat_ios":
-					conn.Write([]byte("dev202_1_rtime.value 0\r\n"))
-					conn.Write([]byte("dev202_1_wtime.value 0\r\n"))
+					averageData := iostat.GetAverageTimeData()
+					for i, average := range averageData {
+						if average.AverageReadTime < 0 {
+							conn.Write([]byte(fmt.Sprintf("dev0_%d_rtime.value U\r\n", i)))
+						} else {
+							conn.Write([]byte(fmt.Sprintf("dev0_%d_rtime.value %f\r\n", i, average.AverageReadTime)))
+						}
+						if average.AverageWriteTime < 0 {
+							conn.Write([]byte(fmt.Sprintf("dev0_%d_wtime.value U\r\n", i)))
+						} else {
+							conn.Write([]byte(fmt.Sprintf("dev0_%d_wtime.value %f\r\n", i, average.AverageWriteTime)))
+						}
+					}
 					conn.Write([]byte(".\r\n"))
 			}
 		case "config":
