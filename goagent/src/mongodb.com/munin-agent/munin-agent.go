@@ -19,7 +19,11 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 		tokens := strings.Split(scanner.Text(), " ")
 		switch tokens[0] {
 		case "fetch":
-			switch tokens[1] {
+			service := ""
+			if len(tokens) >= 2 {
+				service = tokens[1]
+			}
+			switch service {
 				case "cpu":
 					cpuTimes := cpu.GetCPUTimes()
 					conn.Write([]byte(fmt.Sprintf("user.value %d\r\n", cpuTimes.UserTime)))
@@ -54,9 +58,16 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 						}
 					}
 					conn.Write([]byte(".\r\n"))
+				default:
+					conn.Write([]byte("# Unknown service\r\n"))
+					conn.Write([]byte(".\r\n"))
 			}
 		case "config":
-			switch tokens[1] {
+			service := ""
+			if len(tokens) >= 2 {
+				service = tokens[1]
+			}
+			switch service {
 				case "cpu":
 					lines := []string{
 						"graph_title CPU usage",
@@ -161,8 +172,19 @@ func handleConnection(conn *net.TCPConn, cpu *components.CPUMonitor, iostat *com
 					conn.Write([]byte("# Unknown service\r\n"))
 					conn.Write([]byte(".\r\n"))
 			}
+		case "list":
+			conn.Write([]byte("cpu iostat iostat_ios\r\n"))
+		case "version":
+			conn.Write([]byte(fmt.Sprintf("munins node on %s version: 2.0.19-3\r\n", hostname)))
+		case "nodes":
+			conn.Write([]byte(hostname + "\r\n"))
+			conn.Write([]byte(".\r\n"))
+		case "cap":
+			conn.Write([]byte("cap multigraph dirtyconfig\r\n"))
 		case "quit":
 			return
+		default:
+			conn.Write([]byte("# Unknown command. Try cap, list, nodes, config, fetch, version or quit\r\n"))
 		}
 	}
 }
