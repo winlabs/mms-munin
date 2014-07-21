@@ -34,7 +34,7 @@
         <Property Id="ARPHELPLINK" Value="http://mms.mongodb.com" />
         <Property Id="ARPURLINFOABOUT" Value="http://mms.mongodb.com/links/support" />
 
-        <MajorUpgrade DowngradeErrorMessage="!(loc.NoDowngradeError)" />
+        <MajorUpgrade DowngradeErrorMessage="!(loc.NoDowngradeError)" AllowSameVersionUpgrades="yes" />
 
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="$(var.PlatformProgramFilesFolder)" Name="PFiles">
