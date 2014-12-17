@@ -1,10 +1,10 @@
 package components
 
 import (
+	"github.com/winlabs/gowin32/wrappers"
+
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 )
 
 type CPUMonitor struct {
@@ -30,18 +30,13 @@ type CPUTimes struct {
 }
 
 func monitorCPUTime(cpu *CPUMonitor) {
-	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
-	getSystemTimes := kernelDLL.MustFindProc("GetSystemTimes")
 	ticker := time.Tick(time.Second)
 	for {
 		<-ticker
-		idleTime := int64(0)
-		kernelTime := int64(0)
-		userTime := int64(0)
-		getSystemTimes.Call(
-			uintptr(unsafe.Pointer(&idleTime)),
-			uintptr(unsafe.Pointer(&kernelTime)),
-			uintptr(unsafe.Pointer(&userTime)))
+		var idleTime int64
+		var kernelTime int64
+		var userTime int64
+		wrappers.GetSystemTimes(&idleTime, &kernelTime, &userTime)
 		cpu.mutex.Lock()
 		cpu.lastIdleTimeDiff = idleTime - cpu.lastIdleTime
 		cpu.lastKernelTimeDiff = kernelTime - cpu.lastKernelTime

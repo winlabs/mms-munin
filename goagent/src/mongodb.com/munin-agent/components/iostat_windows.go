@@ -1,29 +1,11 @@
 package components
 
 import (
+	"github.com/winlabs/gowin32"
+
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 )
-
-const DRIVE_FIXED = 3
-const IOCTL_DISK_PERFORMANCE = 0x00070020
-
-type DISK_PERFORMANCE struct {
-	BytesRead int64
-	BytesWritten int64
-	ReadTime int64
-	WriteTime int64
-	IdleTime int64
-	ReadCount uint32
-	WriteCount uint32
-	QueueDepth uint32
-	SplitCount uint32
-	QueryTime int64
-	StorageDeviceNumber uint32
-	StorageManagerName [8]uint16
-}
 
 type IOStatCountData struct {
 	ReadCount uint32
@@ -51,73 +33,37 @@ type IOStat struct {
 }
 
 func monitorIOStat(iostat* IOStat) {
-	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
-	deviceIoControl := kernelDLL.MustFindProc("DeviceIoControl")
 	ticker := time.Tick(time.Second)
 	for {
 		<-ticker
 		iostat.mutex.Lock()
 		for i, volume := range iostat.volumes {
-			hFile, _ := syscall.CreateFile(
-				syscall.StringToUTF16Ptr("\\\\.\\" + volume + ":"),
-				0,
-				syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE,
-				nil,
-				syscall.OPEN_EXISTING,
-				0,
-				0)
-			diskPerformance := DISK_PERFORMANCE{}
-			diskPerformanceSize := uint32(0)
-			deviceIoControl.Call(
-				uintptr(hFile),
-				IOCTL_DISK_PERFORMANCE,
-				0,
-				0,
-				uintptr(unsafe.Pointer(&diskPerformance)),
-				unsafe.Sizeof(diskPerformance),
-				uintptr(unsafe.Pointer(&diskPerformanceSize)),
-				0)
-			syscall.CloseHandle(hFile)
-			iostat.countDiffs[i].ReadCount = diskPerformance.ReadCount - iostat.lastCounts[i].ReadCount
-			iostat.countDiffs[i].WriteCount = diskPerformance.WriteCount - iostat.lastCounts[i].WriteCount
-			iostat.lastCounts[i].ReadCount = diskPerformance.ReadCount
-			iostat.lastCounts[i].WriteCount = diskPerformance.WriteCount
-			iostat.timeDiffs[i].ReadTime = diskPerformance.ReadTime - iostat.lastTimes[i].ReadTime
-			iostat.timeDiffs[i].WriteTime = diskPerformance.WriteTime - iostat.lastTimes[i].WriteTime
-			iostat.lastTimes[i].ReadTime = diskPerformance.ReadTime
-			iostat.lastTimes[i].WriteTime = diskPerformance.WriteTime
+			info, _ := gowin32.GetDiskPerformanceInfo("\\\\.\\" + volume + ":")
+			iostat.countDiffs[i].ReadCount = info.ReadCount - iostat.lastCounts[i].ReadCount
+			iostat.countDiffs[i].WriteCount = info.WriteCount - iostat.lastCounts[i].WriteCount
+			iostat.lastCounts[i].ReadCount = info.ReadCount
+			iostat.lastCounts[i].WriteCount = info.WriteCount
+			iostat.timeDiffs[i].ReadTime = info.ReadTime - iostat.lastTimes[i].ReadTime
+			iostat.timeDiffs[i].WriteTime = info.WriteTime - iostat.lastTimes[i].WriteTime
+			iostat.lastTimes[i].ReadTime = info.ReadTime
+			iostat.lastTimes[i].WriteTime = info.WriteTime
 		}
 		iostat.mutex.Unlock()
 	}
 }
 
 func NewIOStat() *IOStat {
-	kernelDLL := syscall.MustLoadDLL("KERNEL32.DLL")
-	getDriveType := kernelDLL.MustFindProc("GetDriveTypeW")
-	getVolumeInformation := kernelDLL.MustFindProc("GetVolumeInformationW")
-
 	possibleVolumes := []string{ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" }
 	volumes := make([]string, 0, 26)
 	labels := make([]string, 0, 26)
 	for _, candidate := range possibleVolumes {
 		root := candidate + ":\\"
-		rootPtr := syscall.StringToUTF16Ptr(root)
-		driveType, _, _ := getDriveType.Call(uintptr(unsafe.Pointer(rootPtr)))
-		if driveType == DRIVE_FIXED {
+		driveType := gowin32.GetVolumeDriveType(root)
+		if driveType == gowin32.DriveFixed {
 			volumes = append(volumes, candidate)
-			labelBuffer := [syscall.MAX_PATH]uint16{}
-			getVolumeInformation.Call(
-				uintptr(unsafe.Pointer(rootPtr)),
-				uintptr(unsafe.Pointer(&labelBuffer)),
-				syscall.MAX_PATH,
-				0,
-				0,
-				0,
-				0,
-				0)
-			label := syscall.UTF16ToString((&labelBuffer)[:])
-			if len(label) > 0 {
-				labels = append(labels, label)
+			info, _ := gowin32.GetVolumeInfo(root)
+			if len(info.VolumeName) > 0 {
+				labels = append(labels, info.VolumeName)
 			} else {
 				labels = append(labels, candidate + "Drive")
 			}
