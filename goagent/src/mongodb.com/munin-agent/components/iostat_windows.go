@@ -8,8 +8,8 @@ import (
 )
 
 type IOStatCountData struct {
-	ReadCount uint32
-	WriteCount uint32
+	ReadCount uint
+	WriteCount uint
 }
 
 type IOStatTimeData struct {
